@@ -1,9 +1,8 @@
 import numpy as np
 import math
 
-from pyquil import Program, get_qc
-from pyquil.quil import DefGate
-from pyquil.gates import *
+from qiskit import QuantumCircuit, execute, Aer
+from qiskit.quantum_info.operators import Operator
 
 
 '''
@@ -20,13 +19,8 @@ class GroverSolver(object):
     def __init__(self, num_qubits, f):
         self.__num_qubits = num_qubits
         self.__f = f
-        self.__instantiate_qubits()
         self.__compute_matrices()
         self.__build_grover_circuit()
-
-
-    def __instantiate_qubits(self):
-        self.__qubits = list(range(int(self.__num_qubits)))
 
 
     def __compute_matrices(self):
@@ -56,32 +50,36 @@ class GroverSolver(object):
 
     def __build_grover_circuit(self):
         # initialize program and define new gates
-        p = Program()
-        p.defgate("ZF_GATE", self.__Zf)
-        p.defgate("Z0_GATE", self.__Z0)
-        p.defgate("NE_GATE", self.__Negate)
+        p = QuantumCircuit(self.__num_qubits, self.__num_qubits)
+        ZF_GATE = Operator(self.__Zf)
+        Z0_GATE = Operator(self.__Z0)
+        NE_GATE = Operator(self.__Negate)
 
         # apply first round of Hadamard gates
         for i in range(self.__num_qubits):
-            p += H(i)
+            p.h(i)
 
         # apply Grover as many times as needed
         for i in range(self.__num_iterations()):
-            p.inst(tuple(["ZF_GATE"] + self.__qubits))
+            p.append(ZF_GATE, list(range(self.__num_qubits)))
             for i in range(self.__num_qubits):
-                p += H(i)
-            p.inst(tuple(["Z0_GATE"] + self.__qubits))
+                p.h(i)
+            p.append(Z0_GATE, list(range(self.__num_qubits)))
             for i in range(self.__num_qubits):
-                p += H(i)
-            p.inst(tuple(["NE_GATE"] + self.__qubits))
+                p.h(i)
+            p.append(NE_GATE, list(range(self.__num_qubits)))
+
+        # measure the qubits
+        p.measure(list(range(self.__num_qubits)), list(range(self.__num_qubits)))
 
         # save the grover circuit
         self.__grover_circuit = p
 
 
     def run(self, trials):
-        qc = get_qc(f"{self.__num_qubits}q-qvm")
-        return qc.run_and_measure(self.__grover_circuit, trials=trials)
+        simulator = Aer.get_backend("qasm_simulator")
+        job = execute(self.__grover_circuit, simulator, shots=trials)
+        return job.result().get_counts()
 
 
 '''
@@ -91,6 +89,7 @@ class GroverSolver(object):
 #                                                                        #
 ##########################################################################
 '''
+
 
 f = lambda x : int(x == '100')
 grover_solver = GroverSolver(3, f)
