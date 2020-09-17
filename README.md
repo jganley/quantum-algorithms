@@ -1,4 +1,4 @@
-## Quantum Algorithms
+# Quantum Algorithms
 
 I have implemented the following quantum algorithms using two popular quantum programming languages, PyQuil and Qiskit.
 
